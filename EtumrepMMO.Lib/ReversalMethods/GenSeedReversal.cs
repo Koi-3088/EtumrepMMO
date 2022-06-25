@@ -6,15 +6,24 @@ namespace EtumrepMMO.Lib;
 /// <summary>
 /// Reverses for middle step seeds by using Z3 to calculate.
 /// </summary>
-public static class GenSeedReversal
+public class GenSeedReversal
 {
-    private static readonly Context ctx = new(new Dictionary<string, string> { { "model", "true" } });
+    private readonly Context ctx;
+    private readonly BitVecExpr GenSeedResult;
+    private readonly BitVecExpr GenSeedExpression;
+
+    public GenSeedReversal()
+    {
+        ctx = new(new Dictionary<string, string> { { "model", "true" } });
+        GenSeedResult = ctx.MkBVConst("s0", 64);
+        GenSeedExpression = GetBaseGenSeedModel();
+    }
 
     /// <summary>
     /// Middle level seed calculation for the Generator Seed
     /// </summary>
     /// <param name="seed">Bottom level Entity seed.</param>
-    public static IEnumerable<ulong> FindPotentialGenSeeds(ulong seed)
+    public IEnumerable<ulong> FindPotentialGenSeeds(ulong seed)
     {
         var exp = CreateGenSeedModel(seed);
 
@@ -37,16 +46,13 @@ public static class GenSeedReversal
         }
     }
 
-    private static readonly BitVecExpr GenSeedResult = ctx.MkBVConst("s0", 64);
-    private static readonly BitVecExpr GenSeedExpression = GetBaseGenSeedModel();
-
-    private static BoolExpr CreateGenSeedModel(ulong seed)
+    private BoolExpr CreateGenSeedModel(ulong seed)
     {
         var real_seed = ctx.MkBV(seed, 64);
         return ctx.MkEq(real_seed, GenSeedExpression);
     }
 
-    private static BitVecExpr GetBaseGenSeedModel()
+    private BitVecExpr GetBaseGenSeedModel()
     {
         BitVecExpr s0 = GenSeedResult;
         BitVecExpr s1 = ctx.MkBV(Xoroshiro128Plus.XOROSHIRO_CONST, 64);
@@ -61,7 +67,7 @@ public static class GenSeedReversal
         // no rot/xor needed, the add result is enough.
     }
 
-    private static Model? Check(BoolExpr cond)
+    private Model? Check(BoolExpr cond)
     {
         Solver solver = ctx.MkSolver();
         solver.Assert(cond);

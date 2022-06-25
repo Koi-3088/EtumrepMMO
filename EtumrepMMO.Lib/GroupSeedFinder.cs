@@ -60,7 +60,7 @@ public static class GroupSeedFinder
             foreach (var (pokeSeed, rolls) in pokeResult)
             {
                 // Get seed for slot-pkm
-                var genSeeds = GenSeedReversal.FindPotentialGenSeeds(pokeSeed);
+                var genSeeds = new GenSeedReversal().FindPotentialGenSeeds(pokeSeed);
                 foreach (var genSeed in genSeeds)
                 {
                     // Get the group seed - O(1) calc
