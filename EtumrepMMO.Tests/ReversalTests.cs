@@ -79,7 +79,7 @@ public class ReversalTests
             expectPoke.Should().Be(seedPoke);
         }
 
-        var reversal = GenSeedReversal.FindPotentialGenSeeds(seedPoke).ToArray();
+        var reversal = new GenSeedReversal().FindPotentialGenSeeds(seedPoke).ToArray();
         if (seedGenPossible.Length == 0)
         {
             reversal.Length.Should().Be(0);
