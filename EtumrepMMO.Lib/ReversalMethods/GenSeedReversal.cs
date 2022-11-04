@@ -6,26 +6,19 @@ namespace EtumrepMMO.Lib;
 /// <summary>
 /// Reverses for middle step seeds by using Z3 to calculate.
 /// </summary>
-public class GenSeedReversal
+public static class GenSeedReversal
 {
-    private readonly Context ctx;
-    private readonly BitVecExpr GenSeedResult;
-    private readonly BitVecExpr GenSeedExpression;
-
-    public GenSeedReversal()
-    {
-        ctx = new(new Dictionary<string, string> { { "model", "true" } });
-        GenSeedResult = ctx.MkBVConst("s0", 64);
-        GenSeedExpression = GetBaseGenSeedModel();
-    }
+    private static readonly Context ctx = new(new Dictionary<string, string> { { "model", "true" } });
 
     /// <summary>
     /// Middle level seed calculation for the Generator Seed
     /// </summary>
     /// <param name="seed">Bottom level Entity seed.</param>
-    public IEnumerable<ulong> FindPotentialGenSeeds(ulong seed)
+    public static IEnumerable<ulong> FindPotentialGenSeeds(ulong seed)
     {
-        var exp = CreateGenSeedModel(seed);
+        using var genSeedResult = ctx.MkBVConst("s0", 64); ;
+        using var genSeedExpression = GetBaseGenSeedModel(genSeedResult);
+        var exp = CreateGenSeedModel(seed, genSeedExpression);
 
         // Z3 is a theorem prover, and only proves if the model can be solved.
         // To yield multiple possible values from the expression, we must re-evaluate with added constraints.
@@ -40,36 +33,38 @@ public class GenSeedReversal
                 yield return possible;
 
                 // Force the model to ignore the above result for s0, so we may get a new result if any.
-                var constraint = ctx.MkNot(ctx.MkEq(GenSeedResult, tmp));
+                using var constraint = ctx.MkNot(ctx.MkEq(genSeedResult, tmp));
                 exp = ctx.MkAnd(exp, constraint);
             }
+            m.Dispose();
         }
+        exp.Dispose();
     }
 
-    private BoolExpr CreateGenSeedModel(ulong seed)
+    private static BoolExpr CreateGenSeedModel(ulong seed, BitVecExpr genSeedExpression)
     {
-        var real_seed = ctx.MkBV(seed, 64);
-        return ctx.MkEq(real_seed, GenSeedExpression);
+        using var real_seed = ctx.MkBV(seed, 64);
+        return ctx.MkEq(real_seed, genSeedExpression);
     }
 
-    private BitVecExpr GetBaseGenSeedModel()
+    private static BitVecExpr GetBaseGenSeedModel(BitVecExpr genSeedResult)
     {
-        BitVecExpr s0 = GenSeedResult;
+        BitVecExpr s0 = genSeedResult;
         BitVecExpr s1 = ctx.MkBV(Xoroshiro128Plus.XOROSHIRO_CONST, 64);
 
         // var slotRand = ctx.MkBVAdd(s0, s1);
         s1 = ctx.MkBVXOR(s0, s1);
-        var tmp = ctx.MkBVRotateLeft(24, s0);
-        var tmp2 = ctx.MkBV(1 << 16, 64);
+        using var tmp = ctx.MkBVRotateLeft(24, s0);
+        using var tmp2 = ctx.MkBV(1 << 16, 64);
         s0 = ctx.MkBVXOR(tmp, ctx.MkBVXOR(s1, ctx.MkBVMul(s1, tmp2)));
         s1 = ctx.MkBVRotateLeft(37, s1);
         return ctx.MkBVAdd(s0, s1); // genSeed
         // no rot/xor needed, the add result is enough.
     }
 
-    private Model? Check(BoolExpr cond)
+    private static Model? Check(BoolExpr cond)
     {
-        Solver solver = ctx.MkSolver();
+        using Solver solver = ctx.MkSolver();
         solver.Assert(cond);
         Status q = solver.Check();
         if (q != Status.SATISFIABLE)

@@ -60,7 +60,7 @@ public static class GroupSeedFinder
             foreach (var (pokeSeed, rolls) in pokeResult)
             {
                 // Get seed for slot-pkm
-                var genSeeds = new GenSeedReversal().FindPotentialGenSeeds(pokeSeed);
+                var genSeeds = GenSeedReversal.FindPotentialGenSeeds(pokeSeed);
                 foreach (var genSeed in genSeeds)
                 {
                     // Get the group seed - O(1) calc
@@ -79,5 +79,51 @@ public static class GroupSeedFinder
             }
         }
         return (0, -1);
+    }
+
+    public static IReadOnlyList<(PKM[], (ulong, byte)[])> GetSeeds(IEnumerable<PKM> data, byte maxRolls = MaxRolls)
+    {
+        var list = new List<(PKM[], (ulong, byte)[])>();
+        var entities = data.ToArray();
+
+        for (int i = 0; i < entities.Length; i++)
+        {
+            var entity = entities[i];
+            var pokeResult = RuntimeReversal.GetSeeds(entity, maxRolls);
+            list.Add((entities, pokeResult));
+        }
+        return list;
+    }
+
+    public static (ulong Seed, int FirstIndex) FindSeed(IReadOnlyList<(PKM[], (ulong, byte)[])> list, SpawnerType mode = All)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            var entity = list[i];
+            var ecs = Array.ConvertAll(entity.Item1, z => z.EncryptionConstant);
+            var seeds = entity.Item2;
+
+            foreach (var (pokeSeed, rolls) in seeds)
+            {
+                // Get seed for slot-pkm
+                var genSeeds = GenSeedReversal.FindPotentialGenSeeds(pokeSeed);
+                foreach (var genSeed in genSeeds)
+                {
+                    // Get the group seed - O(1) calc
+                    var groupSeed = GroupSeedReversal.GetGroupSeed(genSeed);
+                    if (mode.HasFlag(MultiSpawn) && GroupSeedValidator.IsMultiInitial(groupSeed, ecs, i))
+                        Console.WriteLine($"Found a multi-spawn group seed with PID roll count = {rolls}");
+                    else if (mode.HasFlag(SingleSpawn) && GroupSeedValidator.IsSingleSingle(groupSeed, ecs, i))
+                        Console.WriteLine($"Found a single-spawn group seed with PID roll count = {rolls}");
+                    else if (mode.HasFlag(MixedSpawn) && GroupSeedValidator.IsSingleMulti(groupSeed, ecs, i))
+                        Console.WriteLine($"Found a 1+{ecs.Length - 1} spawn group seed with PID roll count = {rolls}");
+                    else
+                        continue;
+
+                    return (groupSeed, i);
+                }
+            }
+        }
+        return (default, -1);
     }
 }
