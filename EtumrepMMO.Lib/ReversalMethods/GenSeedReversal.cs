@@ -54,8 +54,8 @@ public static class GenSeedReversal
 
         // var slotRand = ctx.MkBVAdd(s0, s1);
         s1 = ctx.MkBVXOR(s0, s1);
-        using var tmp = ctx.MkBVRotateLeft(24, s0);
-        using var tmp2 = ctx.MkBV(1 << 16, 64);
+        var tmp = ctx.MkBVRotateLeft(24, s0);
+        var tmp2 = ctx.MkBV(1 << 16, 64);
         s0 = ctx.MkBVXOR(tmp, ctx.MkBVXOR(s1, ctx.MkBVMul(s1, tmp2)));
         s1 = ctx.MkBVRotateLeft(37, s1);
         return ctx.MkBVAdd(s0, s1); // genSeed
